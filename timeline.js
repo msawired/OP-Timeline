@@ -21,7 +21,7 @@ let Timeline = function (blocks = null) {
 		'frameStart': null,
 		'frameEnd': null,
 		'start': null,
-		'loop': null
+		'beforeLoop': null
 	}
 
 
@@ -95,7 +95,7 @@ Timeline.prototype.nextFrame = function () {
 		if (this.frame >= this.end) {
 			if (this.loop) {
 				this.frame = 0;
-				this.trigger('loop');
+				this.trigger('beforeLoop');
 			}
 			else {
 				this.stop();
