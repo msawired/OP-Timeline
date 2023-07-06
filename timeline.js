@@ -29,8 +29,13 @@ let Timeline = function (blocks = null) {
 	this.blocks.forEach((b, i) => {
 		if(typeof b.func == 'string') {
 			//if function is string, extract the function and arguments from the string
+			b.title = b.func;
 			b.args = b.args ?? this._extractArgs(b.func) ?? [];
-			b.func = this._extractFunctionName(b.func) ?? null;
+			let funcName = this._extractFunctionName(b.func) ?? null;
+			b.func = funcName && funcName in window ? window[funcName] : ()=>{};
+		}else{ //function
+			b.title = b.func.name ?? 'Function '+i;
+			b.args = b.args ?? [];
 		}
 
 
@@ -63,6 +68,7 @@ let Timeline = function (blocks = null) {
 }
 
 Timeline.prototype.nextFrame = function () {
+
 	if (this.playing && this.end > 0) {
 		//intro
 		this.frame == 0 && this.trigger('start');
