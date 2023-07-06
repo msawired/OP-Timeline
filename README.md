@@ -134,11 +134,13 @@ myTimeline.play();
 myTimeline.stop();
 myTimeline.noLoop();
 myTimeline.loop();
+myTimeline.jumpToFrame(frameNumber);
 ```
 - **play**: proceeds frames every time `nextFrame` is called.
 - **stop**: doesn't do anything on `nextFrame`, practically stopping the timeline.
 - **noLoop**: prevents timeline to loop when reached at the end.
 - **loop**: timeline restarts when it reaches the end. This is enabled by default.  
+- **jumpToFrame**: jump to frame with the given number.  
 
 # Events
 
@@ -157,3 +159,9 @@ myTimeline.trigger('frameStart', function(){
 * **frameEnd**: triggered at the end of any frame.
 * **start**: triggered at the start of timeline, and every time timeline loops. 
 * **beforeLoop**: triggered right before timeline loops at the end.
+
+# Some Fundamentals
+OP Timeline is actually pretty basic: It runs the functions in certain times. But it also means it doesn't do things that you may expect in similar timeline controls such as music and movie tools (GarageBand, iMovie, etc.). 
+- It is not a scene manager, by default. A new block will not reset anything (such as clearing the background or colors in p5js). For such purpose, you should implement whatever you want in your own function.
+- Everything is in global scope. If you create    
+

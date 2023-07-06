@@ -90,7 +90,17 @@ Timeline.prototype.nextFrame = function () {
 		//chorus: run functions
 		activeBlocks.forEach(b => {
 			b.start == this.frame && this.trigger('blockStart');
-			b.func(...b.args);
+			b.scope = {};
+			b.func.apply(b.scope, b.args);
+			if(b.scope.setup){ //scene manager mode
+				if(b.start == this.frame){ //run setup only once
+					b.scope.setup();
+				}
+				b.scope.draw && b.scope.draw();  //run draw every frame
+				if(b.end == this.frame){ //run teardown only once
+					b.scope.teardown && b.scope.teardown();
+				}
+			}
 			b.end == this.frame && this.trigger('blockEnd');
 		});
 
