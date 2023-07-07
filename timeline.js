@@ -10,7 +10,7 @@ let Timeline = function (blocks = null) {
 	/**
 	 * Each block is {func: string or function, start: frame, end: frame, [args: array]}
 	 * func: the function that should be called. It can be a string or a function. If it is a string, it should be the name of a function in the sketch. If provided with arguments, they will be extracted to the args property automatically.
-	 *  */   
+	 *  */
 	this.frame = 0; //holds the current frame
 	this.playing = true;
 	this.loop = true;
@@ -27,14 +27,12 @@ let Timeline = function (blocks = null) {
 
 	//add end frame to each block if not provided already. End frame is equal to next frames start frame
 	this.blocks.forEach((b, i) => {
-		if(typeof b.func == 'string') {
+		if (typeof b.func == 'string') {
 			//if function is string, extract the function and arguments from the string
 			b.title = b.func;
-			b.args = b.args ?? this._extractArgs(b.func) ?? [];
-			let funcName = this._extractFunctionName(b.func) ?? null;
-			b.func = funcName && funcName in window ? window[funcName] : ()=>{};
-		}else{ //function
-			b.title = b.func.name ?? 'Function '+i;
+			this._extractFunction(b);
+		} else { //function
+			b.title = b.func.name ?? 'Function ' + i;
 			b.args = b.args ?? [];
 		}
 
@@ -46,7 +44,7 @@ let Timeline = function (blocks = null) {
 				b.end = this.blocks[i].start + 100; //should there be a max frame?
 			}
 		}
-		
+
 	});
 
 	//set end of timeline to the max end frame of all blocks
@@ -90,7 +88,9 @@ Timeline.prototype.nextFrame = function () {
 		//chorus: run functions
 		activeBlocks.forEach(b => {
 			b.start == this.frame && this.trigger('blockStart');
-			b.func(...b.args);
+			if(typeof b.func == 'function'){
+				b.func(...b.args);
+			}
 			b.end == this.frame && this.trigger('blockEnd');
 		});
 
@@ -159,10 +159,8 @@ Timeline.prototype._receiveMessage = function (event) {
 	let messageType = event.data.messageType;
 	if (event.data) {
 		let data = typeof event.data.message !== 'undefined' ? event.data.message : null;
-		// console.log('message received', messageType, data);
 		switch (messageType) {
 			case 'jumpToFrame':
-				// console.log('jumping to frame', data);
 				this.jumpToFrame(data);
 				break;
 			case 'syncTimeline':
@@ -181,7 +179,7 @@ Timeline.prototype._receiveMessage = function (event) {
 	}
 }
 
-//syncs the given blocks
+//syncs the given blocks to self blocks
 Timeline.prototype.syncTimeline = function (blocks) {
 	if (this.hasBlocks) {
 		return; //do not sync if there are blocks defined initially. Code overrides DB.
@@ -192,25 +190,10 @@ Timeline.prototype.syncTimeline = function (blocks) {
 
 	//get function and arguments from title
 	this.blocks.forEach(b => {
-		b.func = ()=>{};
-		b.args = [];
-		if (b.title in window) { //simple form: function name is the same as title
-			b.func = window[b.title];
-		} else if (b.args = this._extractArgs(b.title)) { //complex form: title has arguments
-			let fName = this._extractFunctionName(b.title);
-			if (fName in window) {
-				b.func = window[fName];
-			} else { //function not found
-				// sync back that function is not found
-				$OP.callParentFunction("timelineFunctionMissing", b.title);
-				// console.warn(`Function "${b.title}" in timeline is not found in code.`);
-			}
-		} else {
-			b.args = [];
-			$OP.callParentFunction("timelineFunctionMissing", b.title);
-			// console.warn(`Function "${b.title}" in timeline is not found in code.`);
-		}
+		//always comes as string
+		this._extractFunction(b);
 	});
+
 	this._calculateEnd();
 	this._checkFrame();
 	if (wasPlaying) {
@@ -232,18 +215,33 @@ Timeline.prototype._calculateEnd = function () {
 		return Math.max(a, b.end);
 	}, 0);
 }
-Timeline.prototype._extractArgs = function (title) {
-	//extract arguments from function title
-	let args = title.match(/\((.*?)\)/);
-	if (args) {
-		args = args[1].split(',').map(a => a.trim());
+Timeline.prototype._extractFunction = function (b) {
+	//check if function is without arguments
+	if(window[b.title]){
+		b.func = window[b.title];
+		b.args = [];
+		return true;
 	}
-	return args;
-}
-Timeline.prototype._extractFunctionName = function (title) {
-	//extract function name from function title
-	let args = title.match(/\((.*?)\)/);
-	return args ? title.replace(args[0], '') : title;
+
+	// Extract the function name and arguments from the string
+	const regex = /([^\s]+)\((.*)\)/;
+	const match = b.title.match(regex);
+	if (!match) {
+		throw new Error('Invalid function definition in timeline block');
+	}
+
+
+	const functionName = match.length >= 1 ? match[1] : null;
+	const argsString = match.length >= 2 ? match[2] : null;
+	b.func = window[functionName];
+	b.args = argsString ? eval(`[${argsString}]`) : [];
+
+	if (!b.func) {
+		//function not found
+		// sync back that function is not found
+		$OP.callParentFunction("timelineFunctionMissing", b.title);
+	}
+	return true;
 }
 
 
