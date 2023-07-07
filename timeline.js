@@ -227,7 +227,11 @@ Timeline.prototype._extractFunction = function (b) {
 	const regex = /([^\s]+)\((.*)\)/;
 	const match = b.title.match(regex);
 	if (!match) {
-		throw new Error('Invalid function definition in timeline block');
+		b.func=()=>{};
+		b.args = [];
+		$OP.callParentFunction("timelineFunctionMissing", b.title);
+		return false;
+		// throw new Error('Invalid function definition in timeline block');
 	}
 
 
