@@ -1,10 +1,31 @@
-# OP-timeline
+# OP-Timeline
 
- A timeline library that allows users to schedule certain functions to run on certain times. Created mainly for generative art purposes, to be used with p5js and OpenProcessing.
+ A timeline library that allows you to run functions on certain time or frame. It is created mainly for generative art purposes, to be used with p5js and OpenProcessing, but it can still work as a standalone library.
 
 # Quick Start
 
 You can create an instance of a timeline with an array of blocks (aka. functions).
+
+```javascript
+let myTimeline = new Timeline();
+```
+
+[OpenProcessing.org](https://openprocessing.org) provides a powerful and intuitive user interface to use with the timeline library. 
+You can enable Timeline option on sketch settings to control your timeline with this interface. Click on (+) to select any function from the active tab to add to your timeline. You can move functions on timeline and adjust their start and end times easily. 
+
+![OpenProcessing Timeline](docs/openprocessing.gif)
+
+
+Few things to remember:
+- `Draw` function will be set to run by default from frame 0 to 100, but it will loop, effectively running it the same way it does with p5js.
+- Timeline library runs its own timer instead of using P5js timer. It stops P5js timer on load using `noLoop()` to prevent the `draw` function running when not in timeline.
+- You should control the timeline in your code using the [timeline methods](#Methods) (such as `start`, `stop`, `noLoop`) instead of the p5js functions (such as `frameRate`,`loop`,`noLoop`).
+
+
+## Manual Mode
+
+You can create an instance of a timeline with an array of blocks (aka. functions). When provided, all changes in blocks (ie. start, end, etc.) should be made within code. The timeline interface on OpenProcessing will show a frozen version of the blocks provided via code.
+
 
 ```javascript
 let myTimeline = new Timeline([{
@@ -18,14 +39,6 @@ let myTimeline = new Timeline([{
         end: 100
     },
 ]);
-```
-
-Next, ideally in a timer, you run the `nextFrame` function to run your timeline. Based on the current frame timeline is on, it will run the functions that are defined for that frame.
-
-```javascript
-setTimeout(function() {
-    myTimeline.nextFrame(); //run a frame every second. 
-}, 1000) //Use 1000/60 for 60 frames per second.
 ```
 
 ## Blocks
@@ -70,75 +83,48 @@ let myTimeline = new Timeline([{
             }
 ```
 
-## Use with p5js
+## Use as a Standalone Library (without p5js or OpenProcessing)
 
-You can simply add `nextFrame` to your `draw` function.
+You can use this library standalone as a native javascript library to run any function.
 
 ```javascript
 let myTimeline = new Timeline([{
-        func: "drawCircle",
+        func: "showDialog",
         start: 0,
-        end: 100
+        end: 1
     },
     {
-        func: "drawSquare",
-        start: 101,
+        func: "printToConsole",
+        start: 2,
         end: 200
     },
 ]);
 
-function setup() {
-    createCanvas(100, 100);
+function showDialog() {
+    alert('this happens first!');
 }
 
-function draw() {
-    myTimeline.nextFrame();
-}
-
-function drawCircle() {
-    circle(10, 10, 100);
-}
-
-function drawSquare() {
-    square(10, 10, 100);
+function printToConsole() {
+    console.log('this comes next');
 }
 ```
 
-## Use with OpenProcessing
-
-[OpenProcessing.org](https://openprocessing.org) provides a powerful and intuitive user interface to use with the timeline library. 
-
-![OpenProcessing Timeline](docs/openprocessing.gif)
-
-On OpenProcessing, you can enable the timeline on code settings. This will automatically add the most recent version of this library to your sketch. Add your timeline code as below: 
-
-```javascript
-let myTimeline = new Timeline();
-
-function setup() {
-    createCanvas(100, 100);
-}
-
-function draw() {
-    myTimeline.nextFrame();
-}
-```
-
-When you run your sketch, the timeline interface will allow you to create and adjust all the blocks within the interface. Any updates will be synced to the timeline library.
-
-On OpenProcessing, all blocks use the String type for function names (with or without arguments). It is not possible to pass functions directly, as parent frame is not aware of the functions created within the sketch iframe.
-
-# Functions
+# Methods
 ```javascript
 myTimeline.play();
 myTimeline.stop();
+myTimeline.restart();
 myTimeline.noLoop();
 myTimeline.loop();
+myTimeline.setFrameRate();
 ```
-- **play**: proceeds frames every time `nextFrame` is called.
-- **stop**: doesn't do anything on `nextFrame`, practically stopping the timeline.
+- **play**: proceeds frames every time `drawNextFrame` is called.
+- **pause**: pauses the timeline.
+- **stop**: stops the timeline and sets the current frame to 0.
+- **restart**: restarts the timeline from frame 0.
 - **noLoop**: prevents timeline to loop when reached at the end.
-- **loop**: timeline restarts when it reaches the end. This is enabled by default.  
+- **loop**: timeline restarts when it reaches the end. This is enabled by default. 
+- **setFrameRate**: set frame rate that you want the timeline run on. Timeline will try its best to match this timeline, however any CPU intensive functions may slow down this rate. 
 
 # Events
 
