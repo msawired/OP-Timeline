@@ -144,14 +144,23 @@ Timeline.prototype.setFrameRate = function (frameRate) {
 	this.interval = setInterval(this.drawNextFrame.bind(this), 1000 / this.frameRate);
 }
 
-Timeline.prototype.stop = function () {
-	this.playing = false;
-	window.$OP && $OP.callParentFunction("timelinePlaying", this.playing);
-}
 
 Timeline.prototype.play = function () {
 	this.playing = true;
 	window.$OP && $OP.callParentFunction("timelinePlaying", this.playing);
+}
+Timeline.prototype.pause = function () {
+	this.playing = false;
+	window.$OP && $OP.callParentFunction("timelinePlaying", this.playing);
+}
+Timeline.prototype.stop = function () {
+	this.frame = 0;
+	this.playing = false;
+	window.$OP && $OP.callParentFunction("timelinePlaying", this.playing);
+}
+Timeline.prototype.restart = function () {
+	this.jumpToFrame(0);
+	this.play();
 }
 Timeline.prototype.noLoop = function () {
 	this.loop = false;
