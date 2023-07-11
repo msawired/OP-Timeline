@@ -138,8 +138,18 @@ myTimeline.trigger('frameStart', function(){
 })
 ```
 
-* **blockStart**: triggered at the start frame of a block, **before** running the block function, 
-* **frameStart**: triggered at the start of any frame.
-* **frameEnd**: triggered at the end of any frame.
 * **start**: triggered at the start of timeline, and every time timeline loops. 
+* **frameStart**: triggered at the start of any frame.
+* **blockStart**: triggered at the start frame of a block, **before** running the block function, 
+* **blockEnd**: triggered at the start frame of a block, **before** running the block function, 
+* **frameEnd**: triggered at the end of any frame.
 * **beforeLoop**: triggered right before timeline loops at the end.
+
+The order of these events being triggered is as below:
+- start (if at the start)
+- frameStart
+- blockStart (for each block that is starting)
+- //all the functions are run at this point
+- blockEnd (for each block that is ending)
+- frameEnd
+- beforeLoop (if at the end of timeline, right before looping)
