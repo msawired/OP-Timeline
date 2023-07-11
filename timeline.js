@@ -1,4 +1,4 @@
-let Timeline = function (blocks = null) {
+let Timeline = function (mode = "time", blocks = null) {
 	//
 	/* 
 	 * blocks is an array of objects with the following properties:
@@ -11,6 +11,8 @@ let Timeline = function (blocks = null) {
 	 * Each block is {func: string or function, start: frame, end: frame, [args: array]}
 	 * func: the function that should be called. It can be a string or a function. If it is a string, it should be the name of a function in the sketch. If provided with arguments, they will be extracted to the args property automatically.
 	 *  */
+	this.mode = mode; //time or frame
+	this.time = 0; //holds the current time
 	this.frame = 0; //holds the current frame
 	this.playing = true;
 	this.loop = true;
@@ -26,6 +28,11 @@ let Timeline = function (blocks = null) {
 	this.frameRate = 60;
 	this.interval = null;
 	this.preventP5Loop = true;
+
+	this._timeStart = new Date().getTime();
+	this._pauseDuration = 0; //holds the paused amount of time
+	this._pauseStart = null;
+
 
 	//if no blocks defined, add draw as default block
 	if (!this.hasBlocksOnInit) {
@@ -76,55 +83,74 @@ let Timeline = function (blocks = null) {
 	}
 	//setup listener for messages from OpenProcessing
 	window.addEventListener("message", this._receiveMessage.bind(this), '*');
-	this.interval = setInterval(this.drawNextFrame.bind(this), 1000 / this.frameRate);
-
-	//pause p5js draw loop
-	if (this.preventP5Loop) {
-		window.onload = function(){
-			noLoop && noLoop();
+	window.onload = function () {
+		if (this.preventP5Loop) {
+			window.onload = function () {
+				noLoop && noLoop();
+			}
 		}
-	}
+		this.interval = setInterval(this.drawNextFrame.bind(this), 1000 / this.frameRate);
+	}.bind(this);
+	
+	//pause p5js draw loop
+	
 
 }
 
-Timeline.prototype.drawNextFrame = function () {
+Timeline.prototype.drawNextFrame = function (simulate = false) {
+	let now = new Date().getTime();
 
 	if (this.playing && this.end > 0) {
+		if (this._pauseStart) {
+			this._pauseStart = null; //reset pause start
+			this._timeStart += this._pauseDuration; //add paused time to current time
+			this._pauseDuration = 0; //reset paused time
+		}
+		if(simulate){ //simulation will assume the number of frames running per FPS
+			this.time = this.frame * 1000/ this.frameRate;
+		}else{
+			this.time = now - this._timeStart;
+			if (this.mode == 'time') { //calculate current frame
+				this.frame = Math.floor(this.time * this.frameRate / 1000);
+			}
+		}
+
+
 		//pause p5js draw loop
 		if (window.noLoop && this.preventP5Loop) {
 			noLoop();
 		}
 		//intro
-		this.frame == 0 && this.trigger('start');
+		this.frame == 0 && this.trigger('start'); //TODO create time based version of this
 
 		if (window.$OP) {
 			$OP.callParentFunction("setTimelineFrame", this.frame);
 		}
 		this.trigger('frameStart');
 
-		//find the functions that is in this frame and call them
-		let activeBlocks = this.blocks.filter(b => b.start <= this.frame && b.end >= this.frame);
+		//verse: find the functions that is in this frame and call them
+		let activeBlocks = this._getActiveBlocks();
 		activeBlocks.length && activeBlocks.reverse();
-
-		//check if there is any new blocks. if so, run blockStart once
-		// if (this.events['blockStart']) {
-		// 	this.blocks.find(b => b.start == this.frame) && this.trigger('blockStart');
-		// }
 
 		//chorus: run functions
 		activeBlocks.forEach(b => {
-			b.start == this.frame && this.trigger('blockStart');
-			if(typeof b.func == 'function'){
+			!b.playing && this.trigger('blockStart');
+			b.playing = true;
+			if (typeof b.func == 'function') {
 				b.func(...b.args);
 			}
-			b.end == this.frame && this.trigger('blockEnd');
+		});
+		this._getBlocksToStop().forEach(b => {
+			this.trigger('blockEnd');
+			b.playing = false;
 		});
 
 		//outro
-
 		this.trigger('frameEnd');
 
-		if (this.frame >= this.end) {
+		//check if timeline is finished
+		let val = this.mode == "time" ? this.time : this.frame;
+		if (val >= this.end && !simulate) {
 			if (this.loop) {
 				this.frame = 0;
 				this.trigger('beforeLoop');
@@ -135,6 +161,9 @@ Timeline.prototype.drawNextFrame = function () {
 		}
 		this.frame++;
 
+	} else {//paused
+		this._pauseStart = this._pauseStart ?? now; //start counting pause
+		this._pauseDuration = now - this._pauseStart;
 	}
 }
 
@@ -174,35 +203,50 @@ Timeline.prototype.on = function (eventName, func) {
 Timeline.prototype.trigger = function (eventName) {
 	this.events[eventName] && this.events[eventName]();
 }
-Timeline.prototype.jumpToFrame = function (frame) {
-	frame = +frame;
-	if (frame > this.end)
+Timeline.prototype.jumpTo = function (val) {
+	let ref = this.mode == 'time' ? this.time : this.frame;
+	val = Math.round(+val);
+	if (val > this.end)
 		return;
-
-	//if target is before the current frame, restart the sketch from the beginning
-	if (this.frame > frame) {
-		this.frame = 0;
-	}
+		
 	let wasPlaying = this.playing;
 	let wasLooping = this.loop;
+	//if target is before the current frame, restart the sketch from the beginning
+	if (ref > val) {
+		this.stop();
+	}
 	this.playing = true;
 	this.loop = false; //prevent infinite loops
-	while (this.frame <= frame) {
-		this.drawNextFrame();
+	// debugger;
+	let safeCounter=0;
+	while (typeof ref != 'undefined' && (this.mode == 'time' ? this.time : this.frame) <= val) {
+		this.drawNextFrame(true);
+		if (safeCounter++ > 10000){
+			debugger;
+			break;
+		}
 	}
 	this.loop = wasLooping;
 	this.playing = wasPlaying;
 }
 
 /* INTERNAL FUNCTIONS BELOW */
+Timeline.prototype._getActiveBlocks = function () {
+	let ref = this.mode == 'time' ? this.time : this.frame;
+	return this.blocks.filter(b => b.start <= ref && b.end >= ref);
+}
+Timeline.prototype._getBlocksToStop = function () {
+	let ref = this.mode == 'time' ? this.time : this.frame;
+	return this.blocks.filter(b => b.playing && (b.start > ref || b.end < ref));
+}
 
 Timeline.prototype._receiveMessage = function (event) {
 	let messageType = event.data.messageType;
 	if (event.data) {
 		let data = typeof event.data.message !== 'undefined' ? event.data.message : null;
 		switch (messageType) {
-			case 'jumpToFrame':
-				this.jumpToFrame(data);
+			case 'jumpTo':
+				this.jumpTo(data);
 				break;
 			case 'syncTimeline':
 				this.syncTimeline(data);
@@ -258,7 +302,7 @@ Timeline.prototype._calculateEnd = function () {
 }
 Timeline.prototype._extractFunction = function (b) {
 	//check if function is without arguments
-	if(window[b.title]){
+	if (window[b.title]) {
 		b.func = window[b.title];
 		b.args = [];
 		return true;
@@ -268,7 +312,7 @@ Timeline.prototype._extractFunction = function (b) {
 	const regex = /([^\s]+)\((.*)\)/;
 	const match = b.title.match(regex);
 	if (!match) {
-		b.func=()=>{};
+		b.func = () => { };
 		b.args = [];
 		$OP.callParentFunction("timelineFunctionMissing", b.title);
 		return false;
@@ -288,5 +332,6 @@ Timeline.prototype._extractFunction = function (b) {
 	}
 	return true;
 }
+
 
 
