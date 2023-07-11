@@ -126,7 +126,7 @@ Timeline.prototype.drawNextFrame = function () {
 
 		if (this.frame >= this.end) {
 			if (this.loop) {
-				this.frame = 0;
+				this._reset();
 				this.trigger('beforeLoop');
 			}
 			else {
@@ -154,12 +154,12 @@ Timeline.prototype.pause = function () {
 	window.$OP && $OP.callParentFunction("timelinePlaying", this.playing);
 }
 Timeline.prototype.stop = function () {
-	this.frame = 0;
+	this._reset();
 	this.playing = false;
 	window.$OP && $OP.callParentFunction("timelinePlaying", this.playing);
 }
 Timeline.prototype.restart = function () {
-	this.jumpToFrame(0);
+	this._reset();
 	this.play();
 }
 Timeline.prototype.noLoop = function () {
@@ -195,6 +195,12 @@ Timeline.prototype.jumpToFrame = function (frame) {
 }
 
 /* INTERNAL FUNCTIONS BELOW */
+Timeline.prototype._reset = function () {
+	this.frame = 0;
+	if (window.$OP) {
+		$OP.callParentFunction("setTimelineFrame", this.frame);
+	}
+}
 
 Timeline.prototype._receiveMessage = function (event) {
 	let messageType = event.data.messageType;
@@ -215,6 +221,9 @@ Timeline.prototype._receiveMessage = function (event) {
 				break;
 			case 'stopTimeline':
 				this.stop();
+				break;
+			case 'pauseTimeline':
+				this.pause();
 				break;
 		}
 	}
