@@ -152,7 +152,7 @@ Timeline.prototype.drawNextFrame = function (simulate = false) {
 		let val = this.mode == "time" ? this.time : this.frame;
 		if (val >= this.end && !simulate) {
 			if (this.loop) {
-				this.frame = 0;
+				this._reset();
 				this.trigger('beforeLoop');
 			}
 			else {
@@ -183,12 +183,12 @@ Timeline.prototype.pause = function () {
 	window.$OP && $OP.callParentFunction("timelinePlaying", this.playing);
 }
 Timeline.prototype.stop = function () {
-	this.frame = 0;
+	this._reset();
 	this.playing = false;
 	window.$OP && $OP.callParentFunction("timelinePlaying", this.playing);
 }
 Timeline.prototype.restart = function () {
-	this.jumpToFrame(0);
+	this._reset();
 	this.play();
 }
 Timeline.prototype.noLoop = function () {
@@ -231,6 +231,17 @@ Timeline.prototype.jumpTo = function (val) {
 }
 
 /* INTERNAL FUNCTIONS BELOW */
+Timeline.prototype._reset = function () {
+	console.log('resetting timeline');
+	this._timeStart = new Date().getTime();
+	this._pauseStart = null;
+	this._pauseDuration = 0;
+	this.time = 0;
+	this.frame = 0;
+	if (window.$OP) {
+		$OP.callParentFunction("setTimelineFrame", this.frame);
+	}
+}
 Timeline.prototype._getActiveBlocks = function () {
 	let ref = this.mode == 'time' ? this.time : this.frame;
 	return this.blocks.filter(b => b.start <= ref && b.end >= ref);
@@ -259,6 +270,9 @@ Timeline.prototype._receiveMessage = function (event) {
 				break;
 			case 'stopTimeline':
 				this.stop();
+				break;
+			case 'pauseTimeline':
+				this.pause();
 				break;
 		}
 	}
