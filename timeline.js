@@ -5,7 +5,7 @@ let Timeline = function (blocks = null) {
 	 * function: the function that should be called
 	 * start: the frame at which the block starts	
 	*/
-	this.hasBlocks = blocks ? true : false; //if there are no blocks, follow the timeline of the sketch
+	this.hasBlocksOnInit = blocks ? true : false; //if there are no blocks, follow the timeline of the sketch
 	this.blocks = blocks ?? []; //holds the blocks. 
 	/**
 	 * Each block is {func: string or function, start: frame, end: frame, [args: array]}
@@ -23,6 +23,20 @@ let Timeline = function (blocks = null) {
 		'start': null,
 		'beforeLoop': null
 	}
+	this.frameRate = 60;
+	this.interval = null;
+	this.preventP5Loop = true;
+
+	//if no blocks defined, add draw as default block
+	if (!this.hasBlocksOnInit) {
+		this.blocks.push({
+			func: 'draw',
+			start: 0,
+			end: 100
+		});
+	}
+
+
 
 
 	//add end frame to each block if not provided already. End frame is equal to next frames start frame
@@ -56,18 +70,30 @@ let Timeline = function (blocks = null) {
 
 	//communicate with OpenProcessing
 	if (window.$OP) {
-		this.hasBlocks && $OP.callParentFunction("initTimeline", this.blocks);
+		$OP.callParentFunction("initTimeline", this.blocks);
 		$OP.callParentFunction("timelineReady", true);
 		$OP.callParentFunction("timelinePlaying", this.playing);
 	}
 	//setup listener for messages from OpenProcessing
 	window.addEventListener("message", this._receiveMessage.bind(this), '*');
+	this.interval = setInterval(this.drawNextFrame.bind(this), 1000 / this.frameRate);
+
+	//pause p5js draw loop
+	if (this.preventP5Loop) {
+		window.onload = function(){
+			noLoop && noLoop();
+		}
+	}
 
 }
 
-Timeline.prototype.nextFrame = function () {
+Timeline.prototype.drawNextFrame = function () {
 
 	if (this.playing && this.end > 0) {
+		//pause p5js draw loop
+		if (window.noLoop && this.preventP5Loop) {
+			noLoop();
+		}
 		//intro
 		this.frame == 0 && this.trigger('start');
 
@@ -112,6 +138,12 @@ Timeline.prototype.nextFrame = function () {
 	}
 }
 
+Timeline.prototype.setFrameRate = function (frameRate) {
+	this.frameRate = frameRate;
+	clearInterval(this.interval);
+	this.interval = setInterval(this.drawNextFrame.bind(this), 1000 / this.frameRate);
+}
+
 Timeline.prototype.stop = function () {
 	this.playing = false;
 	window.$OP && $OP.callParentFunction("timelinePlaying", this.playing);
@@ -147,7 +179,7 @@ Timeline.prototype.jumpToFrame = function (frame) {
 	this.playing = true;
 	this.loop = false; //prevent infinite loops
 	while (this.frame <= frame) {
-		this.nextFrame();
+		this.drawNextFrame();
 	}
 	this.loop = wasLooping;
 	this.playing = wasPlaying;
@@ -181,7 +213,7 @@ Timeline.prototype._receiveMessage = function (event) {
 
 //syncs the given blocks to self blocks
 Timeline.prototype.syncTimeline = function (blocks) {
-	if (this.hasBlocks) {
+	if (this.hasBlocksOnInit) {
 		return; //do not sync if there are blocks defined initially. Code overrides DB.
 	}
 	let wasPlaying = this.playing;
