@@ -34,17 +34,6 @@ let Timeline = function (blocks = null) {
 	this._prevFrameTime = 0;
 	this._realFPS = new Array(60); 
 
-	//if no blocks defined, add draw as default block
-	if (!this.hasBlocksOnInit) {
-		this.blocks.push({
-			func: 'draw',
-			start: 0,
-			end: 100
-		});
-	}
-
-
-
 
 	//add end frame to each block if not provided already. End frame is equal to next frames start frame
 	this.blocks.forEach((b, i) => {
@@ -77,7 +66,7 @@ let Timeline = function (blocks = null) {
 
 	//communicate with OpenProcessing
 	if (window.$OP) {
-		$OP.callParentFunction("initTimeline", this.blocks);
+		$OP.callParentFunction("initTimeline",  this.blocks);
 		$OP.callParentFunction("timelineReady", true);
 		$OP.callParentFunction("timelinePlaying", this.playing);
 	}
@@ -254,9 +243,6 @@ Timeline.prototype._receiveMessage = function (event) {
 
 //syncs the given blocks to self blocks
 Timeline.prototype.syncTimeline = function (blocks) {
-	if (this.hasBlocksOnInit) {
-		return; //do not sync if there are blocks defined initially. Code overrides DB.
-	}
 	let wasPlaying = this.playing;
 	this.pause();
 	this.blocks = JSON.parse(blocks);
@@ -314,7 +300,6 @@ Timeline.prototype._extractFunction = function (b) {
 	b.args = argsString ? eval(`[${argsString}]`) : [];
 
 	if (!b.func) {
-		//function not found
 		// sync back that function is not found
 		$OP.callParentFunction("timelineFunctionMissing", b.title);
 	}
