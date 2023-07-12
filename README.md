@@ -117,6 +117,8 @@ myTimeline.restart();
 myTimeline.noLoop();
 myTimeline.loop();
 myTimeline.setFrameRate();
+myTimeline.getFrameRate();
+myTimeline.getRealFrameRate();
 ```
 - **play**: proceeds frames every time `drawNextFrame` is called.
 - **pause**: pauses the timeline.
@@ -125,6 +127,8 @@ myTimeline.setFrameRate();
 - **noLoop**: prevents timeline to loop when reached at the end.
 - **loop**: timeline restarts when it reaches the end. This is enabled by default. 
 - **setFrameRate**: set frame rate that you want the timeline run on. Timeline will try its best to match this timeline, however any CPU intensive functions may slow down this rate. 
+- **getFrameRate**: returns the currently set (fixed) frameRate. Default 60.
+- **getRealFrameRate**: returns the real calculated frameRate for the last 60 frames. You can use `getRealFrameRate(true)` for instantaneous frame rate.  
 
 # Events
 
@@ -138,12 +142,13 @@ myTimeline.trigger('frameStart', function(){
 })
 ```
 
-* **start**: triggered at the start of timeline, and every time timeline loops. 
+* **start**: triggered at the start of timeline. 
 * **frameStart**: triggered at the start of any frame.
 * **blockStart**: triggered at the start frame of a block, **before** running the block function, 
 * **blockEnd**: triggered at the start frame of a block, **before** running the block function, 
 * **frameEnd**: triggered at the end of any frame.
-* **beforeLoop**: triggered right before timeline loops at the end.
+* **end**: triggered at the end of the timeline. 
+* **beforeLoop**: triggered right before timeline loops at the end, if loop is set to true. Timeline loops by default.
 
 The order of these events being triggered is as below:
 - start (if at the start)
@@ -152,4 +157,5 @@ The order of these events being triggered is as below:
 - //all the functions are run at this point
 - blockEnd (for each block that is ending)
 - frameEnd
+- end
 - beforeLoop (if at the end of timeline, right before looping)

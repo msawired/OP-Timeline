@@ -17,15 +17,22 @@ let Timeline = function (blocks = null) {
 	this.end = 0;
 	this.prevBlocks = [];
 	this.events = {
-		'blockStart': null,
-		'frameStart': null,
-		'frameEnd': null,
 		'start': null,
+		'frameStart': null,
+		'blockStart': null,
+		'blockEnd': null,
+		'frameEnd': null,
+		'end': null,
 		'beforeLoop': null
 	}
 	this.frameRate = 60;
 	this.interval = null;
 	this.preventP5Loop = true;
+
+
+	this._frameTime = 0;
+	this._prevFrameTime = 0;
+	this._realFPS = new Array(60); 
 
 	//if no blocks defined, add draw as default block
 	if (!this.hasBlocksOnInit) {
@@ -76,24 +83,26 @@ let Timeline = function (blocks = null) {
 	}
 	//setup listener for messages from OpenProcessing
 	window.addEventListener("message", this._receiveMessage.bind(this), '*');
-	this.interval = setInterval(this.drawNextFrame.bind(this), 1000 / this.frameRate);
 
-	//pause p5js draw loop
-	if (this.preventP5Loop) {
-		window.onload = function(){
+	
+	window.onload = function () { //wait for p5js to load
+		this.interval = setInterval(this.drawNextFrame.bind(this), 1000 / this.frameRate); //start timer
+
+		//pause p5js draw loop
+		if (this.preventP5Loop) {
 			noLoop && noLoop();
 		}
-	}
+	}.bind(this);
 
 }
 
 Timeline.prototype.drawNextFrame = function () {
+	//calculate real FPS
+	this._frameTime = new Date().getTime();
+	this._realFPS[this.frame%60] = 1000 / (this._frameTime - this._prevFrameTime);
+	this._prevFrameTime = this._frameTime;
 
 	if (this.playing && this.end > 0) {
-		//pause p5js draw loop
-		if (window.noLoop && this.preventP5Loop) {
-			noLoop();
-		}
 		//intro
 		this.frame == 0 && this.trigger('start');
 
@@ -114,7 +123,7 @@ Timeline.prototype.drawNextFrame = function () {
 		//chorus: run functions
 		activeBlocks.forEach(b => {
 			b.start == this.frame && this.trigger('blockStart');
-			if(typeof b.func == 'function'){
+			if (typeof b.func == 'function') {
 				b.func(...b.args);
 			}
 			b.end == this.frame && this.trigger('blockEnd');
@@ -124,24 +133,35 @@ Timeline.prototype.drawNextFrame = function () {
 
 		this.trigger('frameEnd');
 
-		if (this.frame >= this.end) {
+		this.frame++;
+		if (this.frame > this.end) {
+			this.trigger('end');
 			if (this.loop) {
-				this._reset();
 				this.trigger('beforeLoop');
+				this._reset();
 			}
 			else {
 				this.stop();
 			}
 		}
-		this.frame++;
 
 	}
 }
 
 Timeline.prototype.setFrameRate = function (frameRate) {
-	this.frameRate = frameRate;
+	this.frameRate = +frameRate;
 	clearInterval(this.interval);
 	this.interval = setInterval(this.drawNextFrame.bind(this), 1000 / this.frameRate);
+}
+Timeline.prototype.getFrameRate = function () {
+	return this.frameRate;
+}
+Timeline.prototype.getRealFrameRate = function (instantaneous = false) {
+	if (instantaneous){
+		return this._realFPS[this.frame%60]; //return most recent result
+	}else{
+		return this._realFPS.reduce((a,b)=>a+b,0)/this._realFPS.length; //average
+	}
 }
 
 
@@ -225,6 +245,9 @@ Timeline.prototype._receiveMessage = function (event) {
 			case 'pauseTimeline':
 				this.pause();
 				break;
+			case 'setFrameRate':
+				this.setFrameRate(data);
+				break;
 		}
 	}
 }
@@ -235,7 +258,7 @@ Timeline.prototype.syncTimeline = function (blocks) {
 		return; //do not sync if there are blocks defined initially. Code overrides DB.
 	}
 	let wasPlaying = this.playing;
-	this.stop();
+	this.pause();
 	this.blocks = JSON.parse(blocks);
 
 	//get function and arguments from title
@@ -267,7 +290,7 @@ Timeline.prototype._calculateEnd = function () {
 }
 Timeline.prototype._extractFunction = function (b) {
 	//check if function is without arguments
-	if(window[b.title]){
+	if (window[b.title]) {
 		b.func = window[b.title];
 		b.args = [];
 		return true;
@@ -277,7 +300,7 @@ Timeline.prototype._extractFunction = function (b) {
 	const regex = /([^\s]+)\((.*)\)/;
 	const match = b.title.match(regex);
 	if (!match) {
-		b.func=()=>{};
+		b.func = () => { };
 		b.args = [];
 		$OP.callParentFunction("timelineFunctionMissing", b.title);
 		return false;
