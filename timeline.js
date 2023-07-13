@@ -32,7 +32,7 @@ let Timeline = function (blocks = null) {
 
 	this._frameTime = 0;
 	this._prevFrameTime = 0;
-	this._realFPS = new Array(60); 
+	this._realFPS = new Array(60);
 
 
 	//add end frame to each block if not provided already. End frame is equal to next frames start frame
@@ -65,15 +65,14 @@ let Timeline = function (blocks = null) {
 	this.blocks.reverse();
 
 	//communicate with OpenProcessing
-	if (window.$OP) {
-		$OP.callParentFunction("initTimeline",  this.blocks);
-		$OP.callParentFunction("timelineReady", true);
-		$OP.callParentFunction("timelinePlaying", this.playing);
-	}
+	this._callParent("initTimeline", this.blocks.map(b => { return { title: b.title, start: b.start, end: b.end } }));
+	this._callParent("timelineReady", true);
+	this._callParent("timelinePlaying", this.playing);
+
 	//setup listener for messages from OpenProcessing
 	window.addEventListener("message", this._receiveMessage.bind(this), '*');
 
-	
+
 	window.onload = function () { //wait for p5js to load
 		this.interval = setInterval(this.drawNextFrame.bind(this), 1000 / this.frameRate); //start timer
 
@@ -88,16 +87,15 @@ let Timeline = function (blocks = null) {
 Timeline.prototype.drawNextFrame = function () {
 	//calculate real FPS
 	this._frameTime = new Date().getTime();
-	this._realFPS[this.frame%60] = 1000 / (this._frameTime - this._prevFrameTime);
+	this._realFPS[this.frame % 60] = 1000 / (this._frameTime - this._prevFrameTime);
 	this._prevFrameTime = this._frameTime;
 
 	if (this.playing && this.end > 0) {
 		//intro
 		this.frame == 0 && this.trigger('start');
 
-		if (window.$OP) {
-			$OP.callParentFunction("setTimelineFrame", this.frame);
-		}
+		this._callParent("setTimelineFrame", this.frame);
+
 		this.trigger('frameStart');
 
 		//find the functions that is in this frame and call them
@@ -146,26 +144,26 @@ Timeline.prototype.getFrameRate = function () {
 	return this.frameRate;
 }
 Timeline.prototype.getRealFrameRate = function (instantaneous = false) {
-	if (instantaneous){
-		return this._realFPS[this.frame%60]; //return most recent result
-	}else{
-		return this._realFPS.reduce((a,b)=>a+b,0)/this._realFPS.length; //average
+	if (instantaneous) {
+		return this._realFPS[this.frame % 60]; //return most recent result
+	} else {
+		return this._realFPS.reduce((a, b) => a + b, 0) / this._realFPS.length; //average
 	}
 }
 
 
 Timeline.prototype.play = function () {
 	this.playing = true;
-	window.$OP && $OP.callParentFunction("timelinePlaying", this.playing);
+	this._callParent("timelinePlaying", this.playing);
 }
 Timeline.prototype.pause = function () {
 	this.playing = false;
-	window.$OP && $OP.callParentFunction("timelinePlaying", this.playing);
+	this._callParent("timelinePlaying", this.playing);
 }
 Timeline.prototype.stop = function () {
 	this._reset();
 	this.playing = false;
-	window.$OP && $OP.callParentFunction("timelinePlaying", this.playing);
+	this._callParent("timelinePlaying", this.playing);
 }
 Timeline.prototype.restart = function () {
 	this._reset();
@@ -207,7 +205,7 @@ Timeline.prototype.jumpToFrame = function (frame) {
 Timeline.prototype._reset = function () {
 	this.frame = 0;
 	if (window.$OP) {
-		$OP.callParentFunction("setTimelineFrame", this.frame);
+		this._callParent("setTimelineFrame", this.frame);
 	}
 }
 
@@ -288,7 +286,7 @@ Timeline.prototype._extractFunction = function (b) {
 	if (!match) {
 		b.func = () => { };
 		b.args = [];
-		$OP.callParentFunction("timelineFunctionMissing", b.title);
+		this._callParent("timelineFunctionMissing", b.title);
 		return false;
 		// throw new Error('Invalid function definition in timeline block');
 	}
@@ -301,9 +299,18 @@ Timeline.prototype._extractFunction = function (b) {
 
 	if (!b.func) {
 		// sync back that function is not found
-		$OP.callParentFunction("timelineFunctionMissing", b.title);
+		this._callParent("timelineFunctionMissing", b.title);
 	}
 	return true;
 }
+
+Timeline.prototype._callParent = function (messageType, message) {
+	if (window.$OP) { //send messages only on OpenProcessing
+		window.parent.postMessage({
+			messageType,
+			message
+		}, '*');
+	}
+};
 
 
